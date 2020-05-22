@@ -1,0 +1,478 @@
+---
+swagger: "2.0"
+info:
+  description: |-
+    This specification documents the API that must be implemented for Assignment 1.
+
+    The API provides all of the server-side functionality necessary in order to implement the user stories for Assignment 2.
+  version: "01"
+  title: 'SENG365 2020: Petition Site API'
+tags:
+- name: Backdoor
+  description: Development-only endpoints for resetting and resampling the database.
+- name: petitions
+  description: Endpoints for retrieving, creating, modifying, and deleting petitions.
+- name: petitions.photos
+  description: Endpoints for retrieving and uploading petition hero images.
+- name: petitions.signatures
+  description: Endpoints for retrieving, adding, and deleting signatures for petitions.
+- name: users
+  description: Endpoints for registering, logging in, and retrieving/modifying user information.
+- name: users.photos
+  description: Endpoints for retrieving, uploading, and deleting user profile photos.
+paths:
+  /petitions:
+    get:
+      tags:
+      - petitions
+      summary: View petitions.
+      description: |-
+        By default, the petitions should be sorted by the number of signatures descending (highest to lowest).
+
+        The list should be filtered, then sorted, then paginated using `startIndex` and `count`.
+      parameters:
+      - name: startIndex
+        in: query
+        description: Number of items to skip before returning results.
+        required: false
+      - name: count
+        in: query
+        description: Number of items to include in results.
+        required: false
+      - name: q
+        in: query
+        description: Only include petitions that have the search term within their title.
+        required: false
+      - name: categoryId
+        in: query
+        description: |-
+          Only include petitions of this category (id).
+
+          Only IDs that map to categories are allowed.
+        required: false
+      - name: authorId
+        in: query
+        description: Only include petitions that have the given user (id) as their author.
+        required: false
+      - name: sortBy
+        in: query
+        description: |-
+          Sort the petitions by the given property, according to the following rules:
+          * ALPHABETICAL_ASC: alphabetically by title, A - Z
+          * ALPHABETICAL_DESC: alphabetically by title, Z - A
+          * SIGNATURES_ASC: the number of signatures, from least to most
+          * SIGNATURES_DESC: the number of signatures, from most to least
+
+          Note: how ties (e.g. two petitions with 10 signatures each) are decided is undocumented behaviour, although it should be consistent each time.
+        required: false
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+    post:
+      tags:
+      - petitions
+      summary: Add a new petition.
+      description: The closing date `closingDate` must be in the future, and `categoryId` must reference an existing category.
+      parameters: []
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+  /petitions/{id}:
+    get:
+      tags:
+      - petitions
+      summary: Retrieve detailed information about a petition.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the petition.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+    delete:
+      tags:
+      - petitions
+      summary: Delete a petition.
+      description: Only accessible to the author of the petition. All signatures for the petition will also be deleted.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the petition.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+    patch:
+      tags:
+      - petitions
+      summary: Change a petition's details.
+      description: |-
+        Only accessible to the author of the petition. The closing date `closingDate` must be in the future, and `categoryId` must reference an existing category.
+        Not accessible after the petition has closed (i.e. the closing date is in the past).
+      parameters:
+      - name: id
+        in: path
+        description: ID of the petition.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+  /petitions/categories:
+    get:
+      tags:
+      - petitions
+      summary: Retrieve all data about petition categories.
+      parameters: []
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+  /petitions/{id}/photo:
+    get:
+      tags:
+      - petitions.photos
+      summary: Retrieve a petition's hero image.
+      description: The response MIME type will be either `image/png`, `image/jpeg`, or `image/gif`, depending on the file type of the image being retrieved.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the petition.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - petitions.photos
+      summary: Set a petition's hero image.
+      description: "Only accessible to the author of the petition. If the petition already has a hero image, the current hero image will be replaced with it, and a 200 OK response will be sent. If not, a 201 Created response will be sent.\n\nIf the file is a `.png`, the request will be sent with `Content-Type: image/png`. If the file is a `.jpeg` or `.jpg`, the request will be sent with `Content-Type: image/jpeg`. If the file is a `.gif`, the request will be sent with `Content-Type: image/gif`.\n\nThe request body should contain the raw binary content of the photo, i.e. it should not be in `multipart/form-data` format or contain any file metadata. "
+      parameters:
+      - name: id
+        in: path
+        description: ID of the petition.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+  /petitions/{id}/signatures:
+    get:
+      tags:
+      - petitions.signatures
+      summary: Retrieve a petition's signatures.
+      description: The signatures are returned in chronological order (from earliest to latest).
+      parameters:
+      - name: id
+        in: path
+        description: ID of the petition.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+    post:
+      tags:
+      - petitions.signatures
+      summary: Sign a petition.
+      description: A user cannot sign a petition they have already signed, or a petition that has closed.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the petition.
+        required: true
+      responses:
+        "201":
+          description: Created
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+    delete:
+      tags:
+      - petitions.signatures
+      summary: Remove a signature from a petition.
+      description: A user cannot remove a signature from a petition they haven't signed, from a petition they created, or from a petition that has closed.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the petition.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+  /users/register:
+    post:
+      tags:
+      - users
+      summary: Register as a new user.
+      description: The email must be syntactically valid (e.g. it has to include an `@`, but whether or not it is actually a registered email address will not be checked). The email address must not already be in use. The password must not be empty. Note that the city and country are both optional.
+      parameters: []
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+  /users/login:
+    post:
+      tags:
+      - users
+      summary: Log in as an existing user.
+      description: "The response will contain a (unique) randomly-generated token that the client-side should store. \n\nWhenever the client makes a request that requires authentication, it should provide that same token as the value of the `X-Authorization` header in the request. \n\nThe server will compare this to the value it has stored in the database to authenticate that request."
+      parameters: []
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+  /users/logout:
+    post:
+      tags:
+      - users
+      summary: Log out the currently authorised user.
+      parameters: []
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+  /users/{id}:
+    get:
+      tags:
+      - users
+      summary: Retrieve information about a user.
+      description: The email field is only included when the currently authenticated user is viewing their **own** details.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the user.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - {}
+      - UserToken: []
+    patch:
+      tags:
+      - users
+      summary: Change a user's details.
+      description: Only accessible by the user themselves. The email must be syntactically valid (e.g. it has to include an `@`, but whether or not it is actually a registered email address will not be checked). The email address must not already be in use. The password must not be empty. If the password is being changed, then the current password must also be provided.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the user.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+  /users/{id}/photo:
+    get:
+      tags:
+      - users.photos
+      summary: Retrieve a user's profile photo.
+      description: The response MIME type will be either `image/png`, `image/jpeg`, or `image/gif`, depending on the file type of the image being retrieved.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the user.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+    put:
+      tags:
+      - users.photos
+      summary: Set a user's profile photo.
+      description: "Only accessible to the user themselves. If the user already has a profile photo, the current profile photo will be replaced with it, and a 200 OK response will be sent. If not, a 201 Created response will be sent.\n\nIf the file is a `.png`, the request will be sent with `Content-Type: image/png`. If the file is a `.jpeg` or `.jpg`, the request will be sent with `Content-Type: image/jpeg`. If the file is a `.gif`, the request will be sent with `Content-Type: image/gif`.\n\nThe request body should contain the raw binary content of the photo, i.e. it should not be in `multipart/form-data` format or contain any file metadata. "
+      parameters:
+      - name: id
+        in: path
+        description: ID of the user.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+    delete:
+      tags:
+      - users.photos
+      summary: Delete a user's profile photo.
+      parameters:
+      - name: id
+        in: path
+        description: ID of the user.
+        required: true
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - UserToken: []
+  /reload:
+    post:
+      tags:
+      - Backdoor
+      summary: Force reset of database to original structure and reload sample of data into database.
+      parameters: []
+      responses:
+        "201":
+          description: Created
+        "500":
+          description: Internal Server Error
+  /reset:
+    post:
+      tags:
+      - Backdoor
+      summary: Force reset of database to original structure.
+      parameters: []
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+  /resample:
+    post:
+      tags:
+      - Backdoor
+      summary: Reload sample of data into database.
+      parameters: []
+      responses:
+        "201":
+          description: Created
+        "500":
+          description: Internal Server Error
+  /executeSql:
+    post:
+      tags:
+      - Backdoor
+      summary: Execute any arbitrary SQL statement provided, and return the output from the database.
+      description: This is an enormous security hole, and wouldn't be present in any real application. However, we're using it for testing purposes in this assignment.
+      parameters: []
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+definitions: {}
